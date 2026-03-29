@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"github.com/tarm/serial"
+	//"github.com/tarm/serial"
 	"time"
 	"log"
 	"net/http"
@@ -184,16 +184,16 @@ func main() {
 	var pwh0 mbus.Dfom
     var er error
     var boad int
-    var nstop []serial.StopBits
-    var parity []serial.Parity
+    var nstop []byte
+    var parity []byte
 	http.HandleFunc("/v", httphandler)
     http.HandleFunc("/if3", plotif3)
     http.HandleFunc("/uf3", plotuf3)
-    //-настройки сериал-порта
+    //-получение настроек serial port
     spar := strings.Fields(ps.attr["spsets"])
     boad, er = strconv.Atoi(spar[1])
-    nstop = []serial.StopBits(spar[2])
-    parity = []serial.Parity(spar[3])
+    nstop = []byte(spar[2])
+    parity = []byte(spar[3])
     fmt.Printf("port [%s], boad [%d] nstop [%c], parity [%c]\n", spar[0], boad, nstop[0], parity[0])
     //-
     //er = mbus.Cserial("/dev/ttyUSB0", 9600, 2, 'N')
