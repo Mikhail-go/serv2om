@@ -3,8 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
-	"os"
-	//"github.com/tarm/serial"
+	//"os"
 	"time"
 	"log"
 	"net/http"
@@ -87,7 +86,7 @@ func httphandler(w http.ResponseWriter, r *http.Request) {
 	er = rss.Getrtu(240, 1, 1)
 	if er != nil {
 		fmt.Println(er)
-		os.Exit(1)
+		return //os.Exit(1)
 	}
 	switch {
 	case (rss[0] & 2) == 2 :
@@ -273,7 +272,7 @@ func main() {
 // обработка подключения
 func handleConnection(conn net.Conn) { 
 	var m int
-    var cs1, us16 uint16
+    var us16 uint16
     defer conn.Close()
     cb := make([]byte, 128 ) //
     for {
@@ -286,7 +285,7 @@ func handleConnection(conn net.Conn) {
         if cb[0] == 1  {       
 	        m, err = mbus.Getoms (cb) //посылаем устройству команду и получаем ответ от него
 	            if m==0 || err != nil {
-		        fmt.Println("Ошибка обмена с устройством:", err)
+		        fmt.Println("Ошибка: ", err)
 		        //break //?!
         	    }
         // отправляем ответ клиенту
@@ -298,7 +297,7 @@ func handleConnection(conn net.Conn) {
             hb := cb[4]
             lb := cb[5]
             dru16 := uint16(hb) <<8 + uint16(lb) 
-            cbb := cb[8:]
+            cbb := cb[6:] 
             cbb[0] = cb[0]
             cbb[1] = cb[1]      
             if cb[1] == 6  {
@@ -307,40 +306,41 @@ func handleConnection(conn net.Conn) {
                 if cb[3] == 4 {ps.size["hls"] = int(dru16)} //приняли новый сдвиг просмотра
             }
             if cb[1] != 3 {
-            conn.Write(cb[:8])      //отправляем назад клиенту саму команду (т.к. не нужно обращаться к устройству)
+            conn.Write(cb[:6])      //отправляем назад клиенту саму команду (т.к. не нужно обращаться к устройству)
             continue
             }
-            cbb[2] = 2
+            //формируем ответ при обращении по модбас-адресу 0 
+            cbb[2] = 2 // в cbb[2] счётчик байт данных
             switch  { 
                 case cb[3] == 0 :   //98 байт, на dt.rd (90 байт) +dt.rt (8 байт)
                     cbb[2] = 98
                     getdt(cbb[3:], 98) //получаем данные последней точки
-                    cs1 = mbus.Crcsum(cbb[0:],98+3)
-	                cbb[101] = byte (cs1)
-	                cbb[102] = byte (cs1>>8)
-                    conn.Write(cbb[:103])   //отправляем клиенту
-                break
+                    //cs1 = mbus.Crcsum(cbb[0:],98+3)
+	                //cbb[101] = byte (cs1)
+	                //cbb[102] = byte (cs1>>8)
+                    conn.Write(cbb[:101])   //отправляем клиенту
+               // break
                 case cb[3] == 1 : // чтение 8 байт (time.Duration) по виртуальному адресу 2: cb[1]==0 cb[2]==8
                     cbb[2] = 8            
                     getdt(cbb[3:], 8)  
                     fmt.Println(cbb[:11])
-                    cs1 = mbus.Crcsum(cbb[0:],8+3)
-	                cbb[11] = byte (cs1)
-	                cbb[12] = byte (cs1>>8)
-                    conn.Write(cbb[:13]) //возвращаем 13 байт вместе с КС
-                break            
-                case cb[3] > 1 :
+                    //cs1 = mbus.Crcsum(cbb[0:],8+3)
+	                //cbb[11] = byte (cs1)
+	                //cbb[12] = byte (cs1>>8)
+                    conn.Write(cbb[:11]) //возвращаем 11 байт (без КС)
+               // break            
+                case cb[3] > 1 : //чтение параметра сервера (2 байта)
                     if cb[3] == 2 {us16 = polrun}
                     if cb[3] == 3 {us16 = uint16(ps.size["tlm"])}
                     if cb[3] == 4 {us16 = uint16(ps.size["hls"])}
                     if cb[3] == 5 {us16 = uint16(ps.size["tlom"])} 
                     cbb[3] = byte(us16 >> 8)
                     cbb[4] = byte(us16)
-                    cs1 = mbus.Crcsum(cbb[0:],2+3)
-                    cbb[5] = byte(cs1)
-                    cbb[6] = byte(cs1 >> 8)
-                    conn.Write(cbb[:7]) //возвращаем 7 байт вместе с КС
-                break
+                    //cs1 = mbus.Crcsum(cbb[0:],2+3)
+                    //cbb[5] = byte(cs1)
+                    //cbb[6] = byte(cs1 >> 8)
+                    conn.Write(cbb[:5]) //возвращаем 5 байт (без КС)
+                // break
             }
             
         } 
@@ -485,6 +485,7 @@ func  tickom() error {
     dt.rd[2][2][1], dt.rd[2][2][2] = pwh[2], pwh[3] //фаза В
     dt.rd[2][3][1], dt.rd[2][3][2]= pwh[4], pwh[5] //фаза с
     //-----
+    if Np > 65500 {rdts = rdts[:0]} //сброс в начало
     rdts = append(rdts,dt)  //копим с срезе 
     return nil
 }
