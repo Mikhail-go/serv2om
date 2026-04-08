@@ -271,13 +271,14 @@ func main() {
 }
 // обработка подключения
 func handleConnection(conn net.Conn) { 
-	var m int
+    var m int
     var us16 uint16
+    var cbb []byte
     defer conn.Close()
     cb := make([]byte, 128 ) //
     for {
         // считываем полученные в запросе данные
-        n, err := conn.Read(cb) 
+        n, err := conn.Read(cb) //n=6
         if n == 0 || err != nil {
             fmt.Println("Read error from conn:", err) 
             break
@@ -289,7 +290,8 @@ func handleConnection(conn net.Conn) {
 		        //break //?!
         	    }
         // отправляем ответ клиенту
-        conn.Write(cb[n:m+n])
+	cbb  = cb[8:]
+        conn.Write(cbb[:m])
         continue
         }
         //здесь cb[0] == 0 (виртуальный modbus)
@@ -297,16 +299,18 @@ func handleConnection(conn net.Conn) {
             hb := cb[4]
             lb := cb[5]
             dru16 := uint16(hb) <<8 + uint16(lb) 
-            cbb := cb[6:] 
+            cbb = cb[6:] 
             cbb[0] = cb[0]
             cbb[1] = cb[1]      
             if cb[1] == 6  {
                 if cb[3] == 2 {polrun = dru16}      //приняли от клиента новый флаг опроса ОМ310
                 if cb[3] == 3 {ps.size["tlm"] = int(dru16)} //приняли новый интервал просмота ( для svg графика)
                 if cb[3] == 4 {ps.size["hls"] = int(dru16)} //приняли новый сдвиг просмотра
+		conn.Write(cb[:6])      //отправляем назад клиенту саму команду 
+		continue
             }
             if cb[1] != 3 {
-            conn.Write(cb[:6])      //отправляем назад клиенту саму команду (т.к. не нужно обращаться к устройству)
+            fmt.Println("Unsupported modbus function")
             continue
             }
             //формируем ответ при обращении по модбас-адресу 0 
