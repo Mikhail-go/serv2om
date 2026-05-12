@@ -489,7 +489,7 @@ func  tickom() error {
     dt.rd[2][2][1], dt.rd[2][2][2] = pwh[2], pwh[3] //фаза В
     dt.rd[2][3][1], dt.rd[2][3][2]= pwh[4], pwh[5] //фаза с
     //-----
-    if Np > 65500 {rdts = rdts[:0]} //сброс в начало
+    if len(rdts) > 65500 {rdts = rdts[:0]} //сброс в начало
     rdts = append(rdts,dt)  //копим с срезе 
     return nil
 }
